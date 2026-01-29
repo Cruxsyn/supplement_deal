@@ -1,0 +1,22 @@
+{
+  "name": "supplement-deal-finder",
+  "version": "1.0.0",
+  "description": "Find the best supplement deals through web scraping - no APIs, no tracking, just truth",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd apps/backend && bun run dev",
+    "dev:frontend": "cd apps/frontend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd apps/frontend && npm run build",
+    "start": "cd apps/backend && bun run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

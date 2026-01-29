@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Find the best supplement deals - honest price comparison through web search" />
+    <title>Supplement Deal Finder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=Source+Sans+3:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <h1 class="title">Supplement Deal Finder</h1>
+        <p class="subtitle">A quiet ledger of fair prices</p>
+      </header>
+
+      <div class="layout">
+      <main class="main">
+        <section class="search-section">
+          <form id="search-form" class="search-form">
+            <label for="search-input" class="search-label">
+              What supplement are you looking for?
+            </label>
+            <div class="search-input-wrapper">
+              <input
+                type="text"
+                id="search-input"
+                name="query"
+                class="search-input"
+                placeholder="e.g., Creatine Monohydrate 500g"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" id="search-button" class="search-button">
+                Search
+              </button>
+            </div>
+            <p class="search-hint">
+              Enter a supplement name with quantity for best results
+            </p>
+          </form>
+
+          <div class="common-searches">
+            <p class="common-searches-label">Common searches</p>
+            <div class="common-searches-list" id="common-searches-list">
+              <button type="button" class="search-chip" data-query="Creatine Monohydrate 500g">Creatine Monohydrate</button>
+              <button type="button" class="search-chip" data-query="Whey Protein Isolate 2lb">Whey Protein</button>
+              <button type="button" class="search-chip" data-query="Ashwagandha 600mg">Ashwagandha</button>
+              <button type="button" class="search-chip" data-query="Vitamin D3 5000 IU">Vitamin D3</button>
+              <button type="button" class="search-chip" data-query="Omega 3 Fish Oil 1000mg">Omega 3 Fish Oil</button>
+              <button type="button" class="search-chip" data-query="Magnesium Glycinate 400mg">Magnesium</button>
+              <button type="button" class="search-chip" data-query="Zinc 50mg">Zinc</button>
+              <button type="button" class="search-chip" data-query="L-Theanine 200mg">L-Theanine</button>
+              <button type="button" class="search-chip" data-query="Caffeine 200mg">Caffeine</button>
+              <button type="button" class="search-chip" data-query="BCAA Powder 500g">BCAAs</button>
+              <button type="button" class="search-chip" data-query="Collagen Peptides 500g">Collagen</button>
+              <button type="button" class="search-chip" data-query="Melatonin 5mg">Melatonin</button>
+              <button type="button" class="search-chip" data-query="Probiotics 50 Billion CFU">Probiotics</button>
+              <button type="button" class="search-chip" data-query="Beta Alanine 500g">Beta Alanine</button>
+              <button type="button" class="search-chip" data-query="Citrulline Malate 500g">Citrulline</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="loading-section" class="loading-section hidden">
+          <div class="progress-container">
+            <h2 id="progress-stage" class="progress-stage">Initializing...</h2>
+            <p id="progress-message" class="progress-message">Starting deep search...</p>
+            <p id="progress-detail" class="progress-detail"></p>
+
+            <div class="progress-bar-container">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+
+            <div id="progress-stats" class="progress-stats"></div>
+
+            <p class="progress-note">
+              Deep search examines multiple search engines and crawls product pages.
+              This may take 1-3 minutes for comprehensive results.
+            </p>
+          </div>
+        </section>
+
+        <section id="error-section" class="error-section hidden">
+          <p class="error-text" id="error-message"></p>
+          <button id="retry-button" class="retry-button">Try Again</button>
+        </section>
+
+        <section id="results-section" class="results-section hidden">
+          <div id="best-deal-container"></div>
+          <div id="results-container"></div>
+          <p id="results-meta" class="results-meta"></p>
+        </section>
+
+        <footer class="footer">
+          <p>Prices gathered through web search. Verify before purchase.</p>
+        </footer>
+      </main>
+
+      <aside id="saved-sidebar" class="saved-sidebar">
+        <div class="saved-header">
+          <h2 class="saved-title">Saved Products</h2>
+          <span id="saved-count" class="saved-count">0</span>
+        </div>
+        <div id="saved-list" class="saved-list">
+          <p class="saved-empty">No saved products yet. Click the save button on any product to add it here.</p>
+        </div>
+        <div id="saved-actions" class="saved-actions hidden">
+          <button id="clear-saved" class="clear-saved-button">Clear All</button>
+        </div>
+      </aside>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

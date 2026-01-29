@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun install)",
+      "Bash(npm install)",
+      "Bash(where:*)",
+      "Bash(powershell -Command \"irm bun.sh/install.ps1 | iex\")",
+      "Bash(C:Userschristian.bunbinbun.exe install --cwd D:/Suplu/apps/backend)",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\christian\\\\.bun\\\\bin\\\\bun.exe' install --cwd D:/Suplu/apps/backend\":*)",
+      "Bash(powershell -Command \"Start-Process -FilePath ''C:\\\\Users\\\\christian\\\\.bun\\\\bin\\\\bun.exe'' -ArgumentList ''run D:/Suplu/apps/backend/src/server.ts'' -NoNewWindow -PassThru | Select-Object -ExpandProperty Id; Start-Sleep -Seconds 3\")",
+      "Bash(npx vite build)",
+      "Bash(powershell:*)",
+      "Bash(bun run dev)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}
