@@ -1,11 +1,46 @@
 /**
- * Supplement Deal Finder - Frontend
+ * Deep Deal Finder - Frontend
  *
- * A calm, minimal interface for searching supplement prices.
+ * A calm, minimal interface for searching product prices across categories.
+ * Supports supplements, building products, and robotics parts.
  * Communicates with the Bun backend for search functionality.
  */
 
+import { formatCurrency, formatPricePerUnit, formatQuantity, truncate, formatElapsedTime, getStageIcon } from './utils';
+
 // Types
+type ProductCategory = 'supplements' | 'building' | 'robotics' | 'solar';
+type Country = 'US' | 'CA' | 'UK' | 'DE' | 'FR' | 'ES' | 'IT' | 'NL' | 'SE' | 'AU' | 'NZ' | 'IE' | 'JP' | 'SG';
+type SearchDepth = 'quick' | 'normal' | 'deep' | 'exhaustive';
+type BarcodeType = 'upc-a' | 'ean-13' | 'gtin-14' | 'sku' | 'mpn' | 'unknown';
+type IdentifierSource = 'json-ld' | 'meta-tag' | 'microdata' | 'data-attribute' | 'text-pattern';
+
+interface ShippingInfo {
+  cost: number | null;
+  freeThreshold?: number;
+  isFree: boolean;
+}
+
+interface PromotionInfo {
+  hasCoupon: boolean;
+  couponCode?: string;
+  couponDiscount?: string;
+  subscribeDiscount?: string;
+}
+
+interface ProductIdentifier {
+  type: BarcodeType;
+  value: string;
+  isValidCheckDigit: boolean;
+  source: IdentifierSource;
+}
+
+interface QualityVerification {
+  hasValidUpc: boolean;
+  crossVendorMatches: number;
+  verificationScore: number;
+}
+
 interface ProductResult {
   title: string;
   price: number;
@@ -13,13 +48,26 @@ interface ProductResult {
   quantity: number;
   unit: string;
   price_per_unit: number;
+  price_per_unit_usd?: number;
   vendor: string;
   url: string;
   confidence: number;
+  // UPC/barcode fields (optional)
+  upc?: string;
+  identifiers?: ProductIdentifier[];
+  verification?: QualityVerification;
+  // Enhanced fields (Phase 2)
+  original_price?: number;
+  discount_percent?: number;
+  shipping?: ShippingInfo;
+  promotion?: PromotionInfo;
+  deal_score?: number;
 }
 
 interface SearchResponse {
   query: string;
+  category: ProductCategory;
+  countries: Country[];
   results: ProductResult[];
   best_deal: ProductResult | null;
   timestamp: string;
@@ -39,6 +87,51 @@ interface SearchProgress {
   currentUrl?: string;
   resultsCount?: number;
   elapsedMs?: number;
+}
+
+// Solar Panel types
+interface SolarPanelSpecs {
+  wattage: number;
+  panelType: string;
+  efficiency: number | null;
+  dimensions: { lengthMm: number | null; widthMm: number | null; depthMm: number | null } | null;
+  weightKg: number | null;
+  warranty: string | null;
+  cellCount: number | null;
+  brand: string | null;
+  model: string | null;
+}
+
+interface SolarPanelResult {
+  title: string;
+  price: number;
+  currency: string;
+  priceUsd: number;
+  pricePerWatt: number;
+  pricePerWattUsd: number;
+  specs: SolarPanelSpecs;
+  vendor: string;
+  url: string;
+  country: string;
+  shipping: { cost: number | null; isFree: boolean; freeThreshold?: number };
+  stockStatus?: 'in-stock' | 'out-of-stock' | 'unknown';
+  confidence: number;
+  lastCrawled: string;
+}
+
+interface SolarLeaderboard {
+  results: SolarPanelResult[];
+  metadata: {
+    totalCrawled: number;
+    totalExtracted: number;
+    totalAfterFiltering: number;
+    crawlStarted: string;
+    crawlCompleted: string;
+    crawlDurationMs: number;
+    countriesCrawled: string[];
+    vendorsCrawled: string[];
+    version: number;
+  };
 }
 
 // API Configuration
@@ -66,9 +159,35 @@ const resultsMeta = document.getElementById('results-meta') as HTMLElement;
 let lastQuery = '';
 let abortController: AbortController | null = null;
 let savedProducts: ProductResult[] = [];
+let currentCategory: ProductCategory = 'supplements';
+let selectedCountries: Country[] = ['US'];
+let selectedDepth: SearchDepth = 'normal';
+
+// Solar state
+let solarData: SolarLeaderboard | null = null;
+let solarLoaded = false;
+let solarPage = 0;
+const SOLAR_PAGE_SIZE = 50;
+let solarActiveCountries: string[] = [];
+let currentFilteredSolarResults: SolarPanelResult[] = [];
+
+// Category tab elements
+const categoryTabs = document.getElementById('category-tabs') as HTMLElement;
+const searchLabel = document.getElementById('search-label') as HTMLElement;
+const searchHint = document.getElementById('search-hint') as HTMLElement;
+
+// Country selector elements
+const countryChips = document.getElementById('country-chips') as HTMLElement;
+
+// Depth selector elements
+const depthChips = document.getElementById('depth-chips') as HTMLElement;
+
+// Common searches per category
+const commonSearchesSupplements = document.getElementById('common-searches-supplements') as HTMLElement;
+const commonSearchesBuilding = document.getElementById('common-searches-building') as HTMLElement;
+const commonSearchesRobotics = document.getElementById('common-searches-robotics') as HTMLElement;
 
 // Saved products elements
-const savedSidebar = document.getElementById('saved-sidebar') as HTMLElement;
 const savedCount = document.getElementById('saved-count') as HTMLElement;
 const savedList = document.getElementById('saved-list') as HTMLElement;
 const savedActions = document.getElementById('saved-actions') as HTMLElement;
@@ -203,77 +322,72 @@ function renderSavedProducts(): void {
   `).join('');
 }
 
-/**
- * Format currency value
- */
-function formatCurrency(value: number | null | undefined, currency: string): string {
-  if (value == null || isNaN(value)) {
-    return '—';
-  }
-  const symbols: Record<string, string> = {
-    USD: '$',
-    EUR: '€',
-    GBP: '£',
-    INR: '₹',
-    JPY: '¥',
-    AUD: 'A$',
-    CAD: 'C$',
-  };
-  const symbol = symbols[currency] || currency + ' ';
-  return `${symbol}${value.toFixed(2)}`;
-}
+// formatCurrency, formatPricePerUnit, formatQuantity, truncate imported from ./utils
 
 /**
- * Format price per unit
+ * Create best deal card HTML with savings badges
  */
-function formatPricePerUnit(value: number | null | undefined, unit: string): string {
-  if (value == null || isNaN(value)) {
-    return `—/${unit}`;
-  }
-  // For very small values (per gram), show more decimals
-  if (value < 0.01) {
-    return `${value.toFixed(4)}/${unit}`;
-  }
-  return `${value.toFixed(2)}/${unit}`;
-}
-
-/**
- * Format quantity with unit
- */
-function formatQuantity(quantity: number | null | undefined, unit: string): string {
-  if (quantity == null || isNaN(quantity)) {
-    return '—';
-  }
-  return `${quantity} ${unit}`;
-}
-
-/**
- * Truncate text to max length
- */
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + '...';
-}
-
-/**
- * Create best deal card HTML
- */
-function createBestDealCard(product: ProductResult): string {
+function createBestDealCard(product: ProductResult, allResults: ProductResult[] = []): string {
   const isSaved = isProductSaved(product);
+  const verificationBadge = product.verification?.hasValidUpc
+    ? `<span class="verification-badge verified" title="UPC Verified">Verified</span>`
+    : '';
+  const crossVendorInfo = product.verification?.crossVendorMatches
+    ? `<span class="cross-vendor-badge" title="Found at ${product.verification.crossVendorMatches + 1} vendors">${product.verification.crossVendorMatches + 1} vendors</span>`
+    : '';
+  const upcDisplay = product.upc
+    ? `<span class="product-upc" title="UPC: ${product.upc}">UPC: ...${product.upc.slice(-4)}</span>`
+    : '';
+
+  // Savings badges (Phase 2 enhancements)
+  let savingsBadge = '';
+  if (allResults.length > 1) {
+    const avgPrice = allResults.reduce((sum, r) => sum + r.price_per_unit, 0) / allResults.length;
+    const savingsPercent = Math.round(((avgPrice - product.price_per_unit) / avgPrice) * 100);
+    if (savingsPercent > 10) {
+      savingsBadge = `<span class="savings-badge" title="${savingsPercent}% below average price">${savingsPercent}% below avg!</span>`;
+    }
+  }
+
+  const shippingBadge = product.shipping?.isFree
+    ? `<span class="shipping-badge free" title="Free shipping">Free Shipping</span>`
+    : '';
+
+  const couponBadge = product.promotion?.hasCoupon
+    ? `<span class="coupon-badge" title="Coupon available: ${product.promotion.couponCode || 'Check site'}">Coupon Available</span>`
+    : '';
+
+  const discountBadge = product.discount_percent && product.discount_percent > 5
+    ? `<span class="discount-badge" title="On sale - ${product.discount_percent}% off">${product.discount_percent}% OFF</span>`
+    : '';
+
+  // Original price display
+  const originalPriceDisplay = product.original_price && product.original_price > product.price
+    ? `<span class="original-price">${formatCurrency(product.original_price, product.currency)}</span>`
+    : '';
+
   return `
     <article class="best-deal-card">
       <header class="best-deal-header">
         <span class="best-deal-badge">Best Value</span>
+        ${savingsBadge}
+        ${discountBadge}
+        ${shippingBadge}
+        ${couponBadge}
+        ${verificationBadge}
+        ${crossVendorInfo}
         <button class="save-button ${isSaved ? 'saved' : ''}" data-url="${product.url}" data-product='${JSON.stringify(product).replace(/'/g, "&#39;")}'>${isSaved ? 'Saved' : 'Save'}</button>
       </header>
       <h2 class="best-deal-title">${truncate(product.title, 100)}</h2>
       <div class="best-deal-price-row">
+        ${originalPriceDisplay}
         <span class="best-deal-price">${formatCurrency(product.price, product.currency)}</span>
         <span class="best-deal-per-unit">${formatPricePerUnit(product.price_per_unit, product.unit)}</span>
       </div>
       <div class="best-deal-meta">
         <span class="best-deal-quantity">${formatQuantity(product.quantity, product.unit)}</span>
         <span class="best-deal-vendor">${product.vendor}</span>
+        ${upcDisplay}
         <a href="${product.url}" target="_blank" rel="noopener noreferrer" class="best-deal-link">View Product</a>
       </div>
     </article>
@@ -281,13 +395,38 @@ function createBestDealCard(product: ProductResult): string {
 }
 
 /**
- * Create result card HTML
+ * Create result card HTML with savings indicators
  */
 function createResultCard(product: ProductResult): string {
   const isSaved = isProductSaved(product);
+  const verificationBadge = product.verification?.hasValidUpc
+    ? `<span class="verification-badge verified" title="UPC Verified">Verified</span>`
+    : '';
+  const crossVendorInfo = product.verification?.crossVendorMatches
+    ? `<span class="cross-vendor-badge" title="Found at ${product.verification.crossVendorMatches + 1} vendors">${product.verification.crossVendorMatches + 1} vendors</span>`
+    : '';
+
+  // Compact badges for result cards
+  const shippingBadge = product.shipping?.isFree
+    ? `<span class="shipping-badge-small free" title="Free shipping">Free Ship</span>`
+    : '';
+  const couponBadge = product.promotion?.hasCoupon
+    ? `<span class="coupon-badge-small" title="Coupon available">Coupon</span>`
+    : '';
+  const discountBadge = product.discount_percent && product.discount_percent > 5
+    ? `<span class="discount-badge-small">${product.discount_percent}% OFF</span>`
+    : '';
+
   return `
     <article class="result-card">
-      <h3 class="result-title">${truncate(product.title, 80)}</h3>
+      <div class="result-header">
+        <h3 class="result-title">${truncate(product.title, 80)}</h3>
+        ${discountBadge}
+        ${shippingBadge}
+        ${couponBadge}
+        ${verificationBadge}
+        ${crossVendorInfo}
+      </div>
       <div class="result-price-row">
         <span class="result-price">${formatCurrency(product.price, product.currency)}</span>
         <span class="result-per-unit">${formatPricePerUnit(product.price_per_unit, product.unit)}</span>
@@ -302,33 +441,7 @@ function createResultCard(product: ProductResult): string {
   `;
 }
 
-/**
- * Format elapsed time
- */
-function formatElapsedTime(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  }
-  return `${seconds}s`;
-}
-
-/**
- * Get stage icon
- */
-function getStageIcon(stage: string): string {
-  switch (stage) {
-    case 'starting': return '...';
-    case 'searching': return '...';
-    case 'crawling': return '...';
-    case 'extracting': return '...';
-    case 'ranking': return '...';
-    case 'complete': return '...';
-    default: return '...';
-  }
-}
+// formatElapsedTime, getStageIcon imported from ./utils
 
 /**
  * Show loading state with progress
@@ -457,9 +570,9 @@ function showResults(response: SearchResponse): void {
   errorSection.classList.add('hidden');
   resultsSection.classList.remove('hidden');
 
-  // Best deal
+  // Best deal (pass all results for savings calculation)
   if (response.best_deal) {
-    bestDealContainer.innerHTML = createBestDealCard(response.best_deal);
+    bestDealContainer.innerHTML = createBestDealCard(response.best_deal, response.results);
   } else {
     bestDealContainer.innerHTML = '';
   }
@@ -522,7 +635,12 @@ async function performSearch(query: string): Promise<void> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({
+        query,
+        category: currentCategory,
+        countries: selectedCountries,
+        depth: selectedDepth,
+      }),
       signal: abortController.signal,
     });
 
@@ -602,11 +720,510 @@ async function performSearch(query: string): Promise<void> {
 }
 
 /**
+ * Category-specific UI configuration
+ */
+const categoryConfig: Record<ProductCategory, {
+  label: string;
+  placeholder: string;
+  hint: string;
+}> = {
+  supplements: {
+    label: 'What supplement are you looking for?',
+    placeholder: 'e.g., Creatine Monohydrate 500g',
+    hint: 'Enter a supplement name with quantity for best results',
+  },
+  building: {
+    label: 'What building product are you looking for?',
+    placeholder: 'e.g., Festool TS 55 Track Saw',
+    hint: 'Enter a tool, material, or hardware product name',
+  },
+  robotics: {
+    label: 'What robotics part are you looking for?',
+    placeholder: 'e.g., NEMA 17 Stepper Motor',
+    hint: 'Enter a sensor, motor, controller, or component name',
+  },
+  solar: {
+    label: '',
+    placeholder: '',
+    hint: '',
+  },
+};
+
+/**
+ * Update UI for selected category
+ */
+function updateCategoryUI(category: ProductCategory): void {
+  const solarSection = document.getElementById('solar-section');
+  const searchSection = document.querySelector('.search-section') as HTMLElement | null;
+
+  // Update tab buttons
+  const tabButtons = categoryTabs?.querySelectorAll('.tab-button');
+  tabButtons?.forEach((btn) => {
+    const btnCategory = (btn as HTMLElement).dataset.category;
+    btn.classList.toggle('active', btnCategory === category);
+  });
+
+  if (category === 'solar') {
+    // Hide search-related UI
+    searchSection?.classList.add('hidden');
+    loadingSection.classList.add('hidden');
+    errorSection.classList.add('hidden');
+    resultsSection.classList.add('hidden');
+    // Show solar section
+    solarSection?.classList.remove('hidden');
+    // Load data if not already loaded
+    loadSolarLeaderboard();
+    return;
+  }
+
+  // Switching away from solar: show search UI, hide solar section
+  searchSection?.classList.remove('hidden');
+  solarSection?.classList.add('hidden');
+
+  const config = categoryConfig[category];
+
+  // Update search form
+  if (searchLabel) searchLabel.textContent = config.label;
+  if (searchInput) searchInput.placeholder = config.placeholder;
+  if (searchHint) searchHint.textContent = config.hint;
+
+  // Show/hide common searches
+  if (commonSearchesSupplements) {
+    commonSearchesSupplements.classList.toggle('hidden', category !== 'supplements');
+  }
+  if (commonSearchesBuilding) {
+    commonSearchesBuilding.classList.toggle('hidden', category !== 'building');
+  }
+  if (commonSearchesRobotics) {
+    commonSearchesRobotics.classList.toggle('hidden', category !== 'robotics');
+  }
+
+  // Clear search input when switching categories
+  if (searchInput) searchInput.value = '';
+
+  // Hide results when switching
+  resultsSection.classList.add('hidden');
+  errorSection.classList.add('hidden');
+}
+
+/**
+ * Load solar leaderboard data from the API
+ */
+async function loadSolarLeaderboard(): Promise<void> {
+  if (solarLoaded && solarData) {
+    renderSolarLeaderboard();
+    return;
+  }
+
+  const loadingEl = document.getElementById('solar-loading');
+  const emptyEl = document.getElementById('solar-empty');
+  const tableWrapper = document.getElementById('solar-table-wrapper');
+
+  loadingEl?.classList.remove('hidden');
+  emptyEl?.classList.add('hidden');
+  tableWrapper?.classList.add('hidden');
+
+  try {
+    // Try API first (dev), fall back to static JSON (Cloudflare Pages)
+    let response = await fetch('/api/solar/leaderboard').catch(() => null);
+    if (!response || !response.ok) {
+      response = await fetch('/solar-leaderboard.json');
+    }
+    if (!response.ok) {
+      throw new Error('Leaderboard not available');
+    }
+    const data = await response.json() as SolarLeaderboard;
+    solarData = data;
+    solarLoaded = true;
+    // Initialize country filter from available data
+    const countries = Array.from(new Set(data.results.map((r) => r.country))).sort();
+    solarActiveCountries = [...countries];
+    populateSolarCountryChips(countries);
+    renderSolarLeaderboard();
+  } catch {
+    loadingEl?.classList.add('hidden');
+    emptyEl?.classList.remove('hidden');
+  }
+}
+
+/**
+ * Populate solar country filter chips from available data
+ */
+function populateSolarCountryChips(countries: string[]): void {
+  const container = document.getElementById('solar-country-filter');
+  if (!container) return;
+
+  container.innerHTML = countries.map((country) => `
+    <button type="button" class="solar-country-chip active" data-country="${country}">${country}</button>
+  `).join('');
+
+  container.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('solar-country-chip')) {
+      const country = target.dataset.country;
+      if (!country) return;
+      if (solarActiveCountries.includes(country)) {
+        // Keep at least one country selected
+        if (solarActiveCountries.length > 1) {
+          solarActiveCountries = solarActiveCountries.filter((c) => c !== country);
+          target.classList.remove('active');
+        }
+      } else {
+        solarActiveCountries.push(country);
+        target.classList.add('active');
+      }
+      solarPage = 0;
+      renderSolarLeaderboard();
+    }
+  });
+}
+
+/**
+ * Apply filters and sort to solar data, then render the table
+ */
+function renderSolarLeaderboard(): void {
+  if (!solarData) return;
+
+  const loadingEl = document.getElementById('solar-loading');
+  const emptyEl = document.getElementById('solar-empty');
+  const tableWrapper = document.getElementById('solar-table-wrapper');
+  const tbody = document.getElementById('solar-tbody');
+  const metaEl = document.getElementById('solar-meta');
+
+  const typeFilter = (document.getElementById('solar-type-filter') as HTMLSelectElement)?.value ?? 'all';
+  const minWatt = parseFloat((document.getElementById('solar-min-watt') as HTMLInputElement)?.value ?? '');
+  const maxWatt = parseFloat((document.getElementById('solar-max-watt') as HTMLInputElement)?.value ?? '');
+  const stockFilter = (document.getElementById('solar-stock-filter') as HTMLSelectElement)?.value ?? 'all';
+  const sortBy = (document.getElementById('solar-sort') as HTMLSelectElement)?.value ?? 'pricePerWatt';
+
+  let filtered = solarData.results.filter((r) => {
+    if (solarActiveCountries.length > 0 && !solarActiveCountries.includes(r.country)) return false;
+    if (typeFilter !== 'all' && r.specs.panelType !== typeFilter) return false;
+    if (!isNaN(minWatt) && r.specs.wattage < minWatt) return false;
+    if (!isNaN(maxWatt) && r.specs.wattage > maxWatt) return false;
+    if (stockFilter === 'in-stock' && r.stockStatus !== 'in-stock') return false;
+    if (stockFilter === 'out-of-stock' && r.stockStatus !== 'out-of-stock') return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    switch (sortBy) {
+      case 'pricePerWatt':
+        return a.pricePerWattUsd - b.pricePerWattUsd;
+      case 'price':
+        return a.priceUsd - b.priceUsd;
+      case 'wattage':
+        return b.specs.wattage - a.specs.wattage;
+      case 'efficiency':
+        return (b.specs.efficiency ?? 0) - (a.specs.efficiency ?? 0);
+      default:
+        return a.pricePerWattUsd - b.pricePerWattUsd;
+    }
+  });
+
+  loadingEl?.classList.add('hidden');
+
+  if (filtered.length === 0) {
+    tableWrapper?.classList.add('hidden');
+    emptyEl?.classList.remove('hidden');
+    renderSolarPagination(0);
+    return;
+  }
+
+  emptyEl?.classList.add('hidden');
+  tableWrapper?.classList.remove('hidden');
+
+  const start = solarPage * SOLAR_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + SOLAR_PAGE_SIZE);
+
+  // Store for detail panel access (page-relative indices)
+  currentFilteredSolarResults = pageItems;
+
+  if (tbody) {
+    tbody.innerHTML = pageItems.map((result, idx) => createSolarRow(result, start + idx + 1, idx)).join('');
+  }
+
+  // Update metadata
+  if (metaEl && solarData.metadata) {
+    const m = solarData.metadata;
+    const crawledDate = new Date(m.crawlCompleted).toLocaleDateString();
+    metaEl.textContent = `${filtered.length} results — last updated ${crawledDate} — ${m.totalCrawled} pages crawled`;
+  }
+
+  renderSolarPagination(filtered.length);
+}
+
+/**
+ * Create a solar table row HTML string
+ */
+function createSolarRow(result: SolarPanelResult, rank: number, index: number): string {
+  const currencySymbol = result.currency === 'USD' ? '$' : result.currency === 'EUR' ? '€' : result.currency === 'GBP' ? '£' : result.currency === 'AUD' ? 'A$' : '$';
+  const ppw = result.pricePerWattUsd.toFixed(3);
+  const typeLabel = result.specs.panelType === 'unknown' ? '-' : result.specs.panelType.charAt(0).toUpperCase() + result.specs.panelType.slice(1, 4);
+  const eff = result.specs.efficiency ? result.specs.efficiency.toFixed(1) + '%' : '-';
+  const brand = result.specs.brand || '-';
+  const isTop10 = rank <= 10;
+  let stockBadge: string;
+  if (result.stockStatus === 'in-stock') {
+    stockBadge = `<span class="stock-badge stock-in">In Stock</span>`;
+  } else if (result.stockStatus === 'out-of-stock') {
+    stockBadge = `<span class="stock-badge stock-out">Out</span>`;
+  } else {
+    stockBadge = `<span class="stock-badge stock-unknown">?</span>`;
+  }
+
+  return `<tr class="solar-row ${isTop10 ? 'solar-top10' : ''}" data-index="${index}" style="cursor: pointer">
+    <td class="solar-col-rank">${rank}</td>
+    <td class="solar-col-ppw"><strong>$${ppw}</strong></td>
+    <td class="solar-col-price">${currencySymbol}${result.price.toFixed(2)}</td>
+    <td class="solar-col-watt">${result.specs.wattage}W</td>
+    <td class="solar-col-type"><span class="solar-type-badge solar-type-${result.specs.panelType}">${typeLabel}</span></td>
+    <td class="solar-col-eff">${eff}</td>
+    <td class="solar-col-brand">${brand}</td>
+    <td class="solar-col-vendor">${result.vendor}</td>
+    <td class="solar-col-country">${result.country}</td>
+    <td class="solar-col-ship">${stockBadge}</td>
+    <td class="solar-col-link"><a href="${result.url}" target="_blank" rel="noopener">View</a></td>
+  </tr>`;
+}
+
+/**
+ * Build the HTML content for a solar detail panel
+ */
+function createSolarDetailContent(result: SolarPanelResult): string {
+  const currencySymbol = result.currency === 'USD' ? '$' : result.currency === 'EUR' ? '€' : result.currency === 'GBP' ? '£' : result.currency === 'AUD' ? 'A$' : '$';
+  const ppw = `$${result.pricePerWattUsd.toFixed(3)}`;
+  const eff = result.specs.efficiency !== null ? `${result.specs.efficiency.toFixed(1)}%` : 'N/A';
+  const dims = result.specs.dimensions
+    ? `${result.specs.dimensions.lengthMm ?? '?'} x ${result.specs.dimensions.widthMm ?? '?'} x ${result.specs.dimensions.depthMm ?? '?'} mm`
+    : 'N/A';
+  const weight = result.specs.weightKg !== null ? `${result.specs.weightKg} kg` : 'N/A';
+  const brand = result.specs.brand || 'N/A';
+  const warranty = result.specs.warranty || 'N/A';
+  const shipText = result.shipping.isFree ? 'Free shipping' : result.shipping.cost !== null ? `${currencySymbol}${result.shipping.cost.toFixed(2)}` : 'Unknown';
+  let stockText: string;
+  let stockColor: string;
+  if (result.stockStatus === 'in-stock') {
+    stockText = 'In Stock';
+    stockColor = '#155724';
+  } else if (result.stockStatus === 'out-of-stock') {
+    stockText = 'Out of Stock';
+    stockColor = '#721c24';
+  } else {
+    stockText = 'Stock Unknown';
+    stockColor = 'var(--color-text-light)';
+  }
+  const confidence = Math.round(result.confidence * 100);
+  const lastCrawled = new Date(result.lastCrawled).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+
+  return `
+    <div class="solar-detail">
+      <div class="solar-detail-grid">
+        <div class="solar-detail-main">
+          <h3 class="solar-detail-title">${result.title}</h3>
+          <div class="solar-detail-price-block">
+            <span class="solar-detail-price">${currencySymbol}${result.price.toFixed(2)}</span>
+            <span class="solar-detail-ppw">${ppw} per watt</span>
+          </div>
+          <div class="solar-detail-vendor">
+            Sold by <strong>${result.vendor}</strong> (${result.country})
+          </div>
+          <a href="${result.url}" target="_blank" rel="noopener" class="solar-detail-link">View Product Page &rarr;</a>
+        </div>
+        <div class="solar-detail-specs">
+          <h4>Technical Specifications</h4>
+          <table class="solar-spec-table">
+            <tr><td>Wattage</td><td>${result.specs.wattage}W</td></tr>
+            <tr><td>Panel Type</td><td>${result.specs.panelType.charAt(0).toUpperCase() + result.specs.panelType.slice(1)}</td></tr>
+            <tr><td>Efficiency</td><td>${eff}</td></tr>
+            <tr><td>Dimensions</td><td>${dims}</td></tr>
+            <tr><td>Weight</td><td>${weight}</td></tr>
+            <tr><td>Brand</td><td>${brand}</td></tr>
+            <tr><td>Warranty</td><td>${warranty}</td></tr>
+          </table>
+        </div>
+        <div class="solar-detail-shipping">
+          <h4>Shipping</h4>
+          <p>${shipText}</p>
+          <p style="color: ${stockColor}; font-weight: 600; font-size: 0.85rem; margin-top: 4px;">${stockText}</p>
+          <p class="solar-detail-confidence">Data confidence: ${confidence}%</p>
+          <p class="solar-detail-crawled">Last checked: ${lastCrawled}</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Toggle the expandable detail panel for a solar row
+ */
+function toggleSolarDetail(index: number, rowElement: Element): void {
+  const nextSibling = rowElement.nextElementSibling;
+  const isAlreadyOpen = nextSibling && nextSibling.classList.contains('solar-detail-row');
+
+  // Close any open detail panel first
+  const tbody = document.getElementById('solar-tbody');
+  const openDetail = tbody?.querySelector('tr.solar-detail-row');
+  if (openDetail) {
+    const associatedRow = openDetail.previousElementSibling as HTMLElement | null;
+    if (associatedRow) associatedRow.classList.remove('expanded');
+    openDetail.remove();
+  }
+
+  // If this row was already open, we are done (toggle closed)
+  if (isAlreadyOpen) return;
+
+  // Build and insert the detail row
+  const result = currentFilteredSolarResults[index];
+  if (!result) return;
+
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'solar-detail-row';
+  detailTr.innerHTML = `<td colspan="11">${createSolarDetailContent(result)}</td>`;
+
+  rowElement.classList.add('expanded');
+  rowElement.after(detailTr);
+}
+
+/**
+ * Render solar pagination controls
+ */
+function renderSolarPagination(totalFiltered: number): void {
+  const container = document.getElementById('solar-pagination');
+  if (!container) return;
+
+  const totalPages = Math.ceil(totalFiltered / SOLAR_PAGE_SIZE);
+
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const currentPage = solarPage + 1;
+
+  container.innerHTML = `
+    <button class="solar-page-btn" id="solar-prev-btn" ${solarPage === 0 ? 'disabled' : ''}>Prev</button>
+    <span class="solar-page-info">Page ${currentPage} of ${totalPages}</span>
+    <button class="solar-page-btn" id="solar-next-btn" ${solarPage >= totalPages - 1 ? 'disabled' : ''}>Next</button>
+  `;
+
+  document.getElementById('solar-prev-btn')?.addEventListener('click', () => {
+    if (solarPage > 0) {
+      solarPage--;
+      renderSolarLeaderboard();
+    }
+  });
+
+  document.getElementById('solar-next-btn')?.addEventListener('click', () => {
+    if (solarPage < totalPages - 1) {
+      solarPage++;
+      renderSolarLeaderboard();
+    }
+  });
+}
+
+/**
+ * Update country selection UI
+ */
+function updateCountryUI(): void {
+  const chips = countryChips?.querySelectorAll('.country-chip');
+  chips?.forEach((chip) => {
+    const country = (chip as HTMLElement).dataset.country as Country;
+    chip.classList.toggle('active', selectedCountries.includes(country));
+  });
+}
+
+/**
+ * Update depth selection UI
+ */
+function updateDepthUI(): void {
+  const chips = depthChips?.querySelectorAll('.depth-chip');
+  chips?.forEach((chip) => {
+    const depth = (chip as HTMLElement).dataset.depth as SearchDepth;
+    chip.classList.toggle('active', depth === selectedDepth);
+  });
+}
+
+/**
  * Initialize event listeners
  */
 function init(): void {
   // Load saved products from localStorage
   loadSavedProducts();
+
+  // Category tab switching
+  if (categoryTabs) {
+    categoryTabs.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const tabButton = target.closest('.tab-button') as HTMLElement;
+      if (tabButton) {
+        const category = tabButton.dataset.category as ProductCategory;
+        if (category && category !== currentCategory) {
+          currentCategory = category;
+          updateCategoryUI(category);
+        }
+      }
+    });
+  }
+
+  // Solar filter event listeners
+  const solarTypeFilter = document.getElementById('solar-type-filter');
+  const solarMinWatt = document.getElementById('solar-min-watt');
+  const solarMaxWatt = document.getElementById('solar-max-watt');
+  const solarStockFilter = document.getElementById('solar-stock-filter');
+  const solarSort = document.getElementById('solar-sort');
+
+  solarTypeFilter?.addEventListener('change', () => { solarPage = 0; renderSolarLeaderboard(); });
+  solarMinWatt?.addEventListener('input', () => { solarPage = 0; renderSolarLeaderboard(); });
+  solarMaxWatt?.addEventListener('input', () => { solarPage = 0; renderSolarLeaderboard(); });
+  solarStockFilter?.addEventListener('change', () => { solarPage = 0; renderSolarLeaderboard(); });
+  solarSort?.addEventListener('change', () => { solarPage = 0; renderSolarLeaderboard(); });
+
+  // Solar row click-to-expand detail panel
+  const solarTbody = document.getElementById('solar-tbody');
+  solarTbody?.addEventListener('click', (e) => {
+    const row = (e.target as HTMLElement).closest('tr.solar-row');
+    if (!row) return;
+    // Don't toggle when clicking the View link
+    if ((e.target as HTMLElement).closest('a')) return;
+    const index = parseInt(row.getAttribute('data-index') || '0');
+    toggleSolarDetail(index, row);
+  });
+
+  // Country selection
+  if (countryChips) {
+    countryChips.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('country-chip')) {
+        const country = target.dataset.country as Country;
+        if (country) {
+          if (selectedCountries.includes(country)) {
+            // Don't allow deselecting the last country
+            if (selectedCountries.length > 1) {
+              selectedCountries = selectedCountries.filter((c) => c !== country);
+            }
+          } else {
+            selectedCountries.push(country);
+          }
+          updateCountryUI();
+        }
+      }
+    });
+  }
+
+  // Depth selection
+  if (depthChips) {
+    depthChips.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('depth-chip')) {
+        const depth = target.dataset.depth as SearchDepth;
+        if (depth && depth !== selectedDepth) {
+          selectedDepth = depth;
+          updateDepthUI();
+        }
+      }
+    });
+  }
 
   // Search form submission
   searchForm.addEventListener('submit', (e) => {
@@ -624,10 +1241,9 @@ function init(): void {
     }
   });
 
-  // Common searches - click to search
-  const commonSearchesList = document.getElementById('common-searches-list');
-  if (commonSearchesList) {
-    commonSearchesList.addEventListener('click', (e) => {
+  // Common searches - click to search (handle all category common searches)
+  document.querySelectorAll('.common-searches-list').forEach((list) => {
+    list.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       if (target.classList.contains('search-chip')) {
         const query = target.dataset.query;
@@ -637,7 +1253,7 @@ function init(): void {
         }
       }
     });
-  }
+  });
 
   // Save button clicks (using event delegation on results section)
   resultsSection.addEventListener('click', (e) => {

@@ -6,10 +6,16 @@
   "main": "src/server.ts",
   "scripts": {
     "start": "bun run src/server.ts",
-    "dev": "bun --watch run src/server.ts"
+    "dev": "bun --watch run src/server.ts",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:e2e": "bun test tests/e2e",
+    "crawl:solar": "bun run src/crawlSolar.ts"
   },
   "dependencies": {
-    "linkedom": "^0.16.8"
+    "linkedom": "^0.16.8",
+    "playwright": "^1.41.0"
   },
   "devDependencies": {
     "@types/bun": "latest"

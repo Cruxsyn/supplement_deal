@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Find the best supplement deals - honest price comparison through web search" />
-    <title>Supplement Deal Finder</title>
+    <meta name="description" content="Find the best deals on supplements, building products, and robotics parts - honest price comparison across multiple countries" />
+    <title>Deep Deal Finder</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=Source+Sans+3:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,15 +13,35 @@
   <body>
     <div id="app">
       <header class="header">
-        <h1 class="title">Supplement Deal Finder</h1>
-        <p class="subtitle">A quiet ledger of fair prices</p>
+        <h1 class="title">Deep Deal Finder</h1>
+        <p class="subtitle">find the best deal across the globe</p>
       </header>
+
+      <!-- Category Tabs -->
+      <nav class="category-tabs" id="category-tabs">
+        <button class="tab-button active" data-category="supplements">
+          <span class="tab-icon">&#x1F48A;</span>
+          <span class="tab-label">Supplements</span>
+        </button>
+        <button class="tab-button" data-category="building">
+          <span class="tab-icon">&#x1F528;</span>
+          <span class="tab-label">Building</span>
+        </button>
+        <button class="tab-button" data-category="robotics">
+          <span class="tab-icon">&#x1F916;</span>
+          <span class="tab-label">Robotics</span>
+        </button>
+        <button class="tab-button" data-category="solar">
+          <span class="tab-icon">&#9728;</span>
+          <span class="tab-label">Solar Panels</span>
+        </button>
+      </nav>
 
       <div class="layout">
       <main class="main">
         <section class="search-section">
           <form id="search-form" class="search-form">
-            <label for="search-input" class="search-label">
+            <label for="search-input" class="search-label" id="search-label">
               What supplement are you looking for?
             </label>
             <div class="search-input-wrapper">
@@ -38,31 +58,251 @@
                 Search
               </button>
             </div>
-            <p class="search-hint">
-              Enter a supplement name with quantity for best results
+            <p class="search-hint" id="search-hint">
+              Enter a product name with quantity for best results
             </p>
           </form>
 
-          <div class="common-searches">
-            <p class="common-searches-label">Common searches</p>
-            <div class="common-searches-list" id="common-searches-list">
-              <button type="button" class="search-chip" data-query="Creatine Monohydrate 500g">Creatine Monohydrate</button>
-              <button type="button" class="search-chip" data-query="Whey Protein Isolate 2lb">Whey Protein</button>
-              <button type="button" class="search-chip" data-query="Ashwagandha 600mg">Ashwagandha</button>
-              <button type="button" class="search-chip" data-query="Vitamin D3 5000 IU">Vitamin D3</button>
-              <button type="button" class="search-chip" data-query="Omega 3 Fish Oil 1000mg">Omega 3 Fish Oil</button>
-              <button type="button" class="search-chip" data-query="Magnesium Glycinate 400mg">Magnesium</button>
-              <button type="button" class="search-chip" data-query="Zinc 50mg">Zinc</button>
-              <button type="button" class="search-chip" data-query="L-Theanine 200mg">L-Theanine</button>
-              <button type="button" class="search-chip" data-query="Caffeine 200mg">Caffeine</button>
-              <button type="button" class="search-chip" data-query="BCAA Powder 500g">BCAAs</button>
-              <button type="button" class="search-chip" data-query="Collagen Peptides 500g">Collagen</button>
-              <button type="button" class="search-chip" data-query="Melatonin 5mg">Melatonin</button>
-              <button type="button" class="search-chip" data-query="Probiotics 50 Billion CFU">Probiotics</button>
-              <button type="button" class="search-chip" data-query="Beta Alanine 500g">Beta Alanine</button>
-              <button type="button" class="search-chip" data-query="Citrulline Malate 500g">Citrulline</button>
+          <!-- Country Selector -->
+          <div class="country-selector">
+            <p class="country-selector-label">Search in countries:</p>
+            <div class="country-chips" id="country-chips">
+              <button type="button" class="country-chip active" data-country="US">US</button>
+              <button type="button" class="country-chip" data-country="CA">CA</button>
+              <button type="button" class="country-chip" data-country="UK">UK</button>
+              <button type="button" class="country-chip" data-country="DE">DE</button>
+              <button type="button" class="country-chip" data-country="AU">AU</button>
+              <button type="button" class="country-chip" data-country="IE">IE</button>
+              <button type="button" class="country-chip" data-country="FR">FR</button>
+              <button type="button" class="country-chip" data-country="NL">NL</button>
+              <button type="button" class="country-chip" data-country="JP">JP</button>
+              <button type="button" class="country-chip" data-country="SG">SG</button>
             </div>
           </div>
+
+          <!-- Search Depth Selector -->
+          <div class="depth-selector">
+            <p class="depth-selector-label">Search depth:</p>
+            <div class="depth-chips" id="depth-chips">
+              <button type="button" class="depth-chip" data-depth="quick" title="Fast search, fewer results">Quick</button>
+              <button type="button" class="depth-chip active" data-depth="normal" title="Balanced search">Normal</button>
+              <button type="button" class="depth-chip" data-depth="deep" title="Thorough search, more results">Deep</button>
+              <button type="button" class="depth-chip" data-depth="exhaustive" title="Maximum coverage, slowest">Exhaustive</button>
+            </div>
+          </div>
+
+          <!-- Supplements Common Searches -->
+          <div class="common-searches" id="common-searches-supplements">
+            <p class="common-searches-label">Common searches</p>
+            <div class="common-searches-list" id="common-searches-list">
+              <button type="button" class="search-chip" data-query="Optimum Nutrition Creatine Monohydrate Powder 300g">ON Creatine 300g</button>
+              <button type="button" class="search-chip" data-query="Optimum Nutrition Gold Standard Whey Protein 5lb">ON Gold Whey 5lb</button>
+              <button type="button" class="search-chip" data-query="KSM-66 Ashwagandha 600mg 120 capsules">Ashwagandha KSM-66</button>
+              <button type="button" class="search-chip" data-query="Thorne Vitamin D3 5000 IU 60 capsules">Thorne Vitamin D3</button>
+              <button type="button" class="search-chip" data-query="Nordic Naturals Ultimate Omega 180 softgels">Nordic Naturals Omega</button>
+              <button type="button" class="search-chip" data-query="Magnesium Glycinate 400mg 120 capsules">Magnesium Glycinate</button>
+              <button type="button" class="search-chip" data-query="AG1 Athletic Greens 30 servings">AG1 Greens Powder</button>
+              <button type="button" class="search-chip" data-query="LMNT Electrolyte Mix 30 packets">LMNT Electrolytes</button>
+              <button type="button" class="search-chip" data-query="Vital Proteins Collagen Peptides 680g">Vital Proteins Collagen</button>
+              <button type="button" class="search-chip" data-query="Seed DS-01 Daily Synbiotic 60 capsules">Seed Probiotic</button>
+              <button type="button" class="search-chip" data-query="Transparent Labs Bulk Pre-Workout 30 servings">TL Bulk Pre-Workout</button>
+              <button type="button" class="search-chip" data-query="Lions Mane Mushroom Extract 500mg 120 capsules">Lions Mane Extract</button>
+              <button type="button" class="search-chip" data-query="Quest Protein Bars Variety Pack 12 count">Quest Bars 12pk</button>
+              <button type="button" class="search-chip" data-query="BCAA Powder 2:1:1 Ratio 300g">BCAAs 300g</button>
+              <button type="button" class="search-chip" data-query="Zinc Picolinate 50mg 120 capsules">Zinc Picolinate</button>
+              <button type="button" class="search-chip" data-query="Vitamin C 1000mg with Rose Hips 250 tablets">Vitamin C 1000mg</button>
+              <button type="button" class="search-chip" data-query="Culturelle Digestive Daily Probiotic 30 capsules">Culturelle Probiotic</button>
+              <button type="button" class="search-chip" data-query="Turmeric Curcumin with BioPerine 1500mg 90 capsules">Turmeric Curcumin</button>
+              <button type="button" class="search-chip" data-query="Melatonin 5mg Time Release 120 tablets">Melatonin 5mg</button>
+              <button type="button" class="search-chip" data-query="Biotin 10000mcg 120 softgels">Biotin 10000mcg</button>
+              <button type="button" class="search-chip" data-query="CoQ10 Ubiquinol 200mg 60 softgels">CoQ10 Ubiquinol</button>
+              <button type="button" class="search-chip" data-query="Sambucus Elderberry Gummies 60 count">Elderberry Gummies</button>
+              <button type="button" class="search-chip" data-query="Iron Bisglycinate 25mg 120 capsules">Iron Bisglycinate</button>
+              <button type="button" class="search-chip" data-query="Methylcobalamin B12 5000mcg 60 lozenges">B12 Methylcobalamin</button>
+              <button type="button" class="search-chip" data-query="Garden of Life Multivitamin for Men 120 tablets">GoL Multivitamin</button>
+              <button type="button" class="search-chip" data-query="L-Glutamine Powder 500g unflavored">Glutamine 500g</button>
+              <button type="button" class="search-chip" data-query="Creatine HCL 750mg 120 capsules">Creatine HCL</button>
+              <button type="button" class="search-chip" data-query="Optimum Nutrition Serious Mass 12lb">ON Mass Gainer 12lb</button>
+              <button type="button" class="search-chip" data-query="Casein Protein Powder Micellar 2lb">Casein Protein 2lb</button>
+              <button type="button" class="search-chip" data-query="MCT Oil Powder C8 C10 16oz">MCT Oil Powder</button>
+              <button type="button" class="search-chip" data-query="Apple Cider Vinegar Gummies 60 count">ACV Gummies</button>
+              <button type="button" class="search-chip" data-query="Green Tea Extract EGCG 500mg 120 capsules">Green Tea EGCG</button>
+              <button type="button" class="search-chip" data-query="Berberine HCL 500mg 120 capsules">Berberine 500mg</button>
+              <button type="button" class="search-chip" data-query="Tongkat Ali 400mg 120 capsules">Tongkat Ali</button>
+              <button type="button" class="search-chip" data-query="Turkesterone 500mg 120 capsules">Turkesterone</button>
+              <button type="button" class="search-chip" data-query="Fadogia Agrestis 600mg 60 capsules">Fadogia Agrestis</button>
+              <button type="button" class="search-chip" data-query="Psyllium Husk Powder 24oz organic">Psyllium Husk</button>
+            </div>
+          </div>
+
+          <!-- Building Common Searches -->
+          <div class="common-searches hidden" id="common-searches-building">
+            <p class="common-searches-label">Common searches</p>
+            <div class="common-searches-list">
+              <button type="button" class="search-chip" data-query="Festool TS 55 REQ Track Saw">Festool TS 55</button>
+              <button type="button" class="search-chip" data-query="Milwaukee M18 FUEL Hammer Drill 2904-20">Milwaukee M18 FUEL</button>
+              <button type="button" class="search-chip" data-query="DeWalt DWS780 12 inch Miter Saw">DeWalt DWS780</button>
+              <button type="button" class="search-chip" data-query="Makita XDT19Z 18V Impact Driver">Makita XDT19Z</button>
+              <button type="button" class="search-chip" data-query="Bosch GLL100-40G Laser Level">Bosch Laser Level</button>
+              <button type="button" class="search-chip" data-query="Kreg 720PRO Pocket Hole Jig">Kreg 720PRO</button>
+              <button type="button" class="search-chip" data-query="Hilti TE 6-A22 Rotary Hammer">Hilti TE 6-A22</button>
+              <button type="button" class="search-chip" data-query="Rockwool Comfortbatt R-15 Insulation">Rockwool R-15</button>
+              <button type="button" class="search-chip" data-query="GRK RSS Structural Screws 10x3 inch 50 pack">GRK RSS Screws</button>
+              <button type="button" class="search-chip" data-query="Simpson Strong-Tie LUS28 Joist Hanger">Simpson LUS28</button>
+              <button type="button" class="search-chip" data-query="Diablo 10 inch 60 tooth Miter Saw Blade">Diablo Saw Blade</button>
+              <button type="button" class="search-chip" data-query="Gorilla Glue Construction Adhesive 28oz">Gorilla Adhesive</button>
+              <button type="button" class="search-chip" data-query="Wera Kraftform Kompakt Screwdriver Set 25 piece">Wera Screwdrivers</button>
+              <button type="button" class="search-chip" data-query="Knipex Cobra Pliers Set 3 piece">Knipex Pliers Set</button>
+              <button type="button" class="search-chip" data-query="Bosch 1617EVSPK Router Combo Kit">Bosch Router Kit</button>
+              <button type="button" class="search-chip" data-query="Freud 10 inch 80 tooth Circular Saw Blade">Freud Saw Blade</button>
+              <button type="button" class="search-chip" data-query="Tekton 1/2 inch Drive Impact Socket Set 14 piece">Tekton Impact Sockets</button>
+              <button type="button" class="search-chip" data-query="Bosch GLM 50 C Laser Measure">Bosch Laser Measure</button>
+              <button type="button" class="search-chip" data-query="Franklin ProSensor T13 Stud Finder">ProSensor Stud Finder</button>
+              <button type="button" class="search-chip" data-query="Fein MultiMaster Oscillating Blade Set">Fein Oscillating Blades</button>
+              <button type="button" class="search-chip" data-query="GRK R4 Multi-Purpose Screws 9x3 inch 100 pack">GRK R4 Screws 100pk</button>
+              <button type="button" class="search-chip" data-query="Charlotte Pipe 1 inch PVC Fittings Assortment">PVC Fittings 1in</button>
+              <button type="button" class="search-chip" data-query="Southwire 12/2 Romex Wire 250ft">Romex Wire 12/2</button>
+              <button type="button" class="search-chip" data-query="Milwaukee M18 LED Work Light 2144-20">Milwaukee Work Light</button>
+              <button type="button" class="search-chip" data-query="3M SecureFit Safety Glasses 20 pack">3M Safety Glasses</button>
+              <button type="button" class="search-chip" data-query="ProKnee Model 0714 Knee Pads">ProKnee Knee Pads</button>
+              <button type="button" class="search-chip" data-query="Veto Pro Pac Tech XL Tool Bag">Veto Pro Pac XL</button>
+              <button type="button" class="search-chip" data-query="Milwaukee Shockwave Impact Drill Bit Set 40 piece">Milwaukee Drill Bits</button>
+              <button type="button" class="search-chip" data-query="Lenox Bi-Metal Hole Saw Kit 17 piece">Lenox Hole Saw Kit</button>
+              <button type="button" class="search-chip" data-query="Lie-Nielsen No. 4 Smoothing Plane">Lie-Nielsen No. 4</button>
+              <button type="button" class="search-chip" data-query="Narex Premium Bench Chisel Set 4 piece">Narex Chisel Set</button>
+              <button type="button" class="search-chip" data-query="Bessey K Body REVO Parallel Clamp 24 inch">Bessey K Body Clamp</button>
+              <button type="button" class="search-chip" data-query="Stanley FatMax Tape Measure 25ft">Stanley FatMax 25ft</button>
+              <button type="button" class="search-chip" data-query="Stabila Type 96-2 Level 48 inch">Stabila Level 48in</button>
+              <button type="button" class="search-chip" data-query="Klein Tools 11-in-1 Screwdriver Multi-Bit">Klein 11-in-1</button>
+              <button type="button" class="search-chip" data-query="Irwin Marples Forstner Bit Set 14 piece">Irwin Forstner Bits</button>
+            </div>
+          </div>
+
+          <!-- Robotics Common Searches -->
+          <div class="common-searches hidden" id="common-searches-robotics">
+            <p class="common-searches-label">Common searches</p>
+            <div class="common-searches-list">
+              <button type="button" class="search-chip" data-query="Raspberry Pi 5 8GB">Raspberry Pi 5 8GB</button>
+              <button type="button" class="search-chip" data-query="Arduino Uno R4 WiFi">Arduino Uno R4 WiFi</button>
+              <button type="button" class="search-chip" data-query="ESP32-S3 DevKitC Development Board">ESP32-S3 DevKit</button>
+              <button type="button" class="search-chip" data-query="NVIDIA Jetson Orin Nano 8GB Developer Kit">Jetson Orin Nano</button>
+              <button type="button" class="search-chip" data-query="NEMA 17 Stepper Motor 1.8 degree 42mm">NEMA 17 Stepper</button>
+              <button type="button" class="search-chip" data-query="Dynamixel XL430-W250-T Servo">Dynamixel XL430</button>
+              <button type="button" class="search-chip" data-query="RPLidar A1M8 360 degree Laser Scanner">RPLidar A1M8</button>
+              <button type="button" class="search-chip" data-query="Intel RealSense D435i Depth Camera">RealSense D435i</button>
+              <button type="button" class="search-chip" data-query="ODrive S1 Motor Controller">ODrive S1</button>
+              <button type="button" class="search-chip" data-query="BNO055 9-DOF IMU Sensor Breakout">BNO055 IMU</button>
+              <button type="button" class="search-chip" data-query="Creality Ender 3 V3 SE 3D Printer">Ender 3 V3 SE</button>
+              <button type="button" class="search-chip" data-query="Raspberry Pi Pico W RP2040">Pi Pico W</button>
+              <button type="button" class="search-chip" data-query="MG996R Digital Servo Motor 180 degree">MG996R Servo</button>
+              <button type="button" class="search-chip" data-query="Tattu 11.1V 3S 1300mAh LiPo Battery">Tattu LiPo 3S</button>
+              <button type="button" class="search-chip" data-query="L298N Dual H-Bridge Motor Driver Module">L298N Motor Driver</button>
+              <button type="button" class="search-chip" data-query="HC-SR04 Ultrasonic Distance Sensor 5 pack">HC-SR04 Sensor 5pk</button>
+              <button type="button" class="search-chip" data-query="MPU6050 6-DOF IMU Accelerometer Gyroscope Module">MPU6050 IMU</button>
+              <button type="button" class="search-chip" data-query="NEO-6M GPS Module with Antenna">NEO-6M GPS</button>
+              <button type="button" class="search-chip" data-query="LoRa SX1276 915MHz Transceiver Module">LoRa SX1276</button>
+              <button type="button" class="search-chip" data-query="SSD1306 0.96 inch OLED Display I2C 5 pack">SSD1306 OLED 5pk</button>
+              <button type="button" class="search-chip" data-query="4 Channel 5V Relay Module Optocoupler">4CH Relay Module</button>
+              <button type="button" class="search-chip" data-query="Mean Well LRS-350-24 Power Supply 24V 14.6A">Mean Well 24V PSU</button>
+              <button type="button" class="search-chip" data-query="Aluminum Heatsink Kit for Raspberry Pi 5">Pi 5 Heatsink Kit</button>
+              <button type="button" class="search-chip" data-query="Dupont Jumper Wire Kit Male Female 120 piece">Jumper Wire Kit 120pc</button>
+              <button type="button" class="search-chip" data-query="MB102 Breadboard 830 Point Solderless 3 pack">Breadboard 3pk</button>
+              <button type="button" class="search-chip" data-query="Hakko FX-888D Soldering Station">Hakko FX-888D</button>
+              <button type="button" class="search-chip" data-query="Rigol DS1054Z Digital Oscilloscope 50MHz">Rigol DS1054Z</button>
+              <button type="button" class="search-chip" data-query="Saleae Logic 8 Logic Analyzer">Saleae Logic 8</button>
+              <button type="button" class="search-chip" data-query="60mm Rubber Robot Wheels with 6mm Hub 4 pack">Robot Wheels 60mm 4pk</button>
+              <button type="button" class="search-chip" data-query="100mm Mecanum Wheels Set of 4">Mecanum Wheels 100mm</button>
+              <button type="button" class="search-chip" data-query="GT2 Timing Belt 6mm 5 meters with Pulleys">GT2 Belt Kit</button>
+              <button type="button" class="search-chip" data-query="608 ZZ Bearings Skateboard Bearings 20 pack">608ZZ Bearings 20pk</button>
+              <button type="button" class="search-chip" data-query="TMC2209 Stepper Motor Driver Module 4 pack">TMC2209 Driver 4pk</button>
+              <button type="button" class="search-chip" data-query="Teensy 4.1 Development Board">Teensy 4.1</button>
+              <button type="button" class="search-chip" data-query="STM32F407 Discovery Development Board">STM32F407 Discovery</button>
+              <button type="button" class="search-chip" data-query="Pimoroni Inventor 2040 W Robotics Board">Inventor 2040 W</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Solar Panel Leaderboard -->
+        <section class="solar-section hidden" id="solar-section">
+          <div class="solar-header">
+            <h2>Solar Panel Deals</h2>
+            <p class="solar-subtitle">Top deals ranked by price per watt across the globe</p>
+            <p class="solar-meta" id="solar-meta"></p>
+          </div>
+
+          <div class="solar-filters" id="solar-filters">
+            <div class="solar-filter-group">
+              <label>Country:</label>
+              <div class="solar-country-chips" id="solar-country-filter">
+                <!-- Filled by JS -->
+              </div>
+            </div>
+            <div class="solar-filter-group">
+              <label>Panel Type:</label>
+              <select id="solar-type-filter" class="solar-select">
+                <option value="all">All Types</option>
+                <option value="monocrystalline">Monocrystalline</option>
+                <option value="polycrystalline">Polycrystalline</option>
+                <option value="thin-film">Thin Film</option>
+                <option value="bifacial">Bifacial</option>
+              </select>
+            </div>
+            <div class="solar-filter-group">
+              <label>Wattage:</label>
+              <input type="number" id="solar-min-watt" placeholder="Min W" class="solar-input">
+              <span>-</span>
+              <input type="number" id="solar-max-watt" placeholder="Max W" class="solar-input">
+            </div>
+            <div class="solar-filter-group">
+              <label>Stock:</label>
+              <select id="solar-stock-filter" class="solar-select">
+                <option value="all">All</option>
+                <option value="in-stock">In Stock Only</option>
+                <option value="out-of-stock">Out of Stock</option>
+              </select>
+            </div>
+            <div class="solar-filter-group">
+              <label>Sort:</label>
+              <select id="solar-sort" class="solar-select">
+                <option value="pricePerWatt">$/Watt (lowest)</option>
+                <option value="price">Price (lowest)</option>
+                <option value="wattage">Wattage (highest)</option>
+                <option value="efficiency">Efficiency (highest)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="solar-loading hidden" id="solar-loading">
+            <p>Loading leaderboard data...</p>
+          </div>
+
+          <div class="solar-empty hidden" id="solar-empty">
+            <p>No solar panel data available yet.</p>
+            <p class="solar-empty-hint">The leaderboard is generated by running the crawl pipeline.</p>
+          </div>
+
+          <div class="solar-table-wrapper" id="solar-table-wrapper">
+            <table class="solar-table" id="solar-table">
+              <thead>
+                <tr>
+                  <th class="solar-col-rank">#</th>
+                  <th class="solar-col-ppw">$/W</th>
+                  <th class="solar-col-price">Price</th>
+                  <th class="solar-col-watt">Watts</th>
+                  <th class="solar-col-type">Type</th>
+                  <th class="solar-col-eff">Eff%</th>
+                  <th class="solar-col-brand">Brand</th>
+                  <th class="solar-col-vendor">Vendor</th>
+                  <th class="solar-col-country">Country</th>
+                  <th class="solar-col-ship">Stock</th>
+                  <th class="solar-col-link"></th>
+                </tr>
+              </thead>
+              <tbody id="solar-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="solar-pagination" id="solar-pagination"></div>
         </section>
 
         <section id="loading-section" class="loading-section hidden">
@@ -96,7 +336,7 @@
         </section>
 
         <footer class="footer">
-          <p>Prices gathered through web search. Verify before purchase.</p>
+          <p>Prices gathered through web search across multiple countries. Verify before purchase.</p>
         </footer>
       </main>
 
